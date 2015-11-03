@@ -4,23 +4,18 @@ from unidecode import unidecode
 import re
 import string
 from nltk.metrics import *
+from nltk.corpus import stopwords
 
-def stripped(test_str):
+def strippedNoSquBrac(test_str):
     ret = ''
-    skip1c = 0 #[
+    # skip1c = 0 #[
     skip2c = 0 #<
     skip3c = 0 #{
     for i in test_str:
-        if i == '[':
-            skip1c += 1
-        elif i == '<':
+        if i == '<':
             skip2c += 1
         elif i == '{':
             skip3c += 1
-        elif i == ']' and skip1c > 0:
-            skip1c -= 1
-        elif i == ']' and skip1c == 0:
-            continue
         elif i == '>'and skip2c > 0:
             skip2c -= 1
         elif i == '>' and skip2c == 0:
@@ -29,9 +24,30 @@ def stripped(test_str):
             skip3c -= 1
         elif i == '}' and skip3c == 0:
             continue
-        elif skip1c == 0 and skip2c == 0 and skip3c == 0:
+        elif skip2c == 0 and skip3c == 0:
             ret += i
     return ret
+
+def squrBracParse(str):
+    if '[' in str and ']' in str:
+        slist = re.findall('\[.*?\]',str)
+
+
+    elif '[' in str and ']' not in str:
+        slist = re.findall('\[.*',str)
+    else:
+        return str
+
+    for ins, sl in enumerate(slist):
+        if '|' in sl:
+
+            res1 = sl.split('|')
+            if '-[' in str:
+                str = str.replace(sl,res1[-1].strip(']'))
+            else:
+                str = str.replace(sl,' '+res1[-1].strip(']'))
+    print str
+    return str
 
 
 def editsWordsList(str):
@@ -44,9 +60,11 @@ def editsWordsList(str):
     '''
     wordl = []
     # wordl = re.compile('\w+').findall(str.strip('.,/"=:<>').lower())
-    wordl = filter(None,[word.strip(string.punctuation)
-                 for word in str.replace(';','; ').split()
-                 ])
+    # wordl = filter(None,[word.strip(string.punctuation)
+                 # for word in str.replace(';','; ').split()
+                 # ])
+    wordl = re.split('; |\[|\]|\(|\)|\s|;|,|\.|!|\*',str)
+    wordl = filter(None, [word.strip(string.punctuation) for word in wordl])
     # print wordl
     return wordl
 
@@ -79,27 +97,50 @@ def checkHttpOnly(str0,str1):
     # print unpuncL
     return checkHttpLink(unpuncL)
 
-def check5gram(str):
-    if len(editsWordsList(stripped(str))) <= 5:
+## get rid of <>, {}; process [] and [|]
+def process_modiString(str):
+    s1 = strippedNoSquBrac(str)
+    s2 = squrBracParse(s1)
+    return s2
+## str must goto process_modiString, then send to num_modiString
+def num_modiString(str):
+    wlist = editsWordsList(str)
+    # print wlist
+    num = len(wlist)
+    # print num
+    if num <= 5:
         return False
     else:
         return True
 
+## get rid of <>, {}; process [] and [|] before goto edit_distance
+def editDistanceProcess(str1,str2):
+    tmp1 = strippedNoSquBrac(str1)
+    tmp2 = strippedNoSquBrac(str2)
+    sq1 = squrBracParse(tmp1)
+    sq2 = squrBracParse(tmp2)
+    fin1 = sq1.strip(string.punctuation)
+    fin2 = sq2.strip(string.punctuation)
+    return edit_distance(fin1,fin2)
+
 def dataclean(_file):
+    stop = stopwords.words('english')
     file = open(_file,'r')
     ## text to record tuples deleted coz column4 is False
-    column4F = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_column4False_Oct30.txt','w')
-    column4T = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_column4True_Oct30.txt','w')
-    tupInTitl = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7SingleBiaW_col9NotEmp_biasedWordinTitle_Oct28.txt','w')
-    goodTup = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7SingleBiaW_col9NotEmp_biasedWordNotinTitle_Oct28.txt','w')
-    notSingleBia = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7notsingleBiaW_Oct28.txt','w')
-    col9Emp = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9Empty_Oct28.txt','w')
-    col7col8HyL = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8difHyperL_Oct28.txt','w')
-    col7col8NotHyL = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_Oct28.txt','w')
-    after5 = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_col8within5_Oct28.txt','w')
-    afterNot5 = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_col8Exceed5_Oct28.txt','w')
-    distance4 = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_col8within5_col7col8editDisGreat4_Oct28.txt','w')
-    distanceNot4 = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_col8within5_col7col8editDisLess4_Oct28.txt','w')
+    column4F = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_column4False_Nov2.txt','w')
+    column4T = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_column4True_Nov2.txt','w')
+    tupInTitl = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7SingleBiaW_col9NotEmp_biasedWordinTitle_Nov2.txt','w')
+    goodTup = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7SingleBiaW_col9NotEmp_biasedWordNotinTitle_Nov2.txt','w')
+    notSingleBia = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7notsingleBiaW_Nov2.txt','w')
+    col9Emp = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9Empty_Nov2.txt','w')
+    col7col8HyL = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8difHyperL_Nov2.txt','w')
+    col7col8NotHyL = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_Nov2.txt','w')
+    after5 = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_col8within5_Nov2.txt','w')
+    afterNot5 = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_col8Exceed5_Nov2.txt','w')
+    distance4 = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_col8within5_col7col8editDisGreat4_Nov2.txt','w')
+    distanceNot4 = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_col8within5_col7col8editDisLess4_Nov2.txt','w')
+    noStop = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_col8within5_col7col8editDisGreat4_noStopWord_ProcBrack_Nov2.txt','w')
+    isStop = open('/Volumes/Seagate Backup Plus Drive/npov_paper_data/npovTrail2/dataclean_col4True_col7singleBiaW_col9NotEmp_biasWordNotinTit_col7col8NotdifHyperL_col8within5_col7col8editDisGreat4_isStopWord_ProcBrack_Nov2.txt','w')
 
     num_line = 0
     for line in file:
@@ -112,7 +153,7 @@ def dataclean(_file):
         if nline[3] == 'true':
             column4T.write(line)
             strip_col6 = nline[6]
-            res_col6 = re.findall('^[A-Za-z-]+$',strip_col6)
+            res_col6 = re.findall('^[a-zA-Z]+[(?:\-)]?[a-zA-Z]+$',strip_col6)
             if not res_col6:
                 notSingleBia.write(line)
                 # res_col6 is empty; no match; col6 is not single-word
@@ -132,16 +173,17 @@ def dataclean(_file):
                             ## differ more than hyperlink
                             col7col8NotHyL.write(line)
                             ## check if after form string contained five or fewer words
-                            if not check5gram(nline[7]):
+                            if not num_modiString(process_modiString(nline[7])):
                                 ## after form is <=5
                                 after5.write(line)
                                 ## check if before form string and after form distance <4
                                 n = nline[6].strip(string.punctuation)
                                 m = nline[7].strip(string.punctuation)
-                                if edit_distance(n,m)>=4:
+                                if editDistanceProcess(n,m)>=4:
                                     ## distance of before after strings >=4
                                     distance4.write(line)
-                                    num_line+=1
+                                    if nline[6] not in stop:
+                                        num_line+=1
                                 else:
                                     ## distance of before after strings <4
                                     distanceNot4.write(line)
